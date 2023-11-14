@@ -7,6 +7,8 @@
 <script src="https://unpkg.com/leaflet@latest/dist/leaflet.js" crossorigin=""></script>
 <script src="https://unpkg.com/leaflet-providers@latest/leaflet-providers.js"></script>
 <script src="https://unpkg.com/@turf/turf@latest"></script>
+<link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+<script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
 <style>
 .control-box {
   height: 3em;
@@ -25,11 +27,44 @@
 <div id="map" style="height: 100vh;"></div>
 
 <script>
+  // Set some defaults
   let startPoint = [55.5, -3]
   let zoom = 6
+
   // Initialize the map
   var mymap = L.map('map').setView(startPoint, zoom);
   let control = new L.control.layers({}, {})
+
+  // Add the leaflet-geoman plugin
+  mymap.pm.addControls({
+    position: 'topleft',
+    drawMarker: false,
+    drawCircleMarker: false,
+    drawRectangle: false,
+    drawPolyline: false,
+    drawText: false,
+    cutPolygon: false,
+    editMode: false,
+    dragMode: false,
+    rotateMode: false,
+  })
+
+  mymap.pm.setGlobalOptions({ snappable: false })
+
+  mymap.on('pm:create', function (event) {
+    let geo = event.layer.toGeoJSON()
+    if (event.shape === 'Circle') {
+      let radius = event.layer.getRadius() / 1000 // m -> km
+      geo = turf.circle(geo, radius)
+    }
+    let zones = []
+    for (let feature of zoneData.features) {
+      if (turf.booleanIntersects(geo, feature)) {
+        zones.push(feature.properties["SEED_ZONES"])
+      }
+    }
+    event.layer.bindTooltip(`Zones:\n${zones.join('\n')}`)
+  })
 
   const onZones = (event) => {
     console.log('EV', event.target.checked)
@@ -71,10 +106,13 @@
   markerLayerGroup.addTo(mymap)
 
   // Get the zones geoJSON
+  let zoneData
   let zoneLayer
   fetch("Forest_Reproductive_Materials_Regions_Of_Provenance_GB.geojson")
     .then((response) => response.json())
     .then((data) => {
+      // Preserve original geoJSON
+      zoneData = data
       zoneLayer = L.geoJSON(data, {
         style: function (feature) {
           return {
