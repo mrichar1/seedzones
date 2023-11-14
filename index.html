@@ -35,6 +35,13 @@
     .then((response) => response.json())
     .then((data) => {
       zoneLayer = L.geoJSON(data, {
+        style: function (feature) {
+          return {
+            fillColor: 'blue',
+            fillOpacity: 0.1,
+            weight: 2,
+          }
+        },
         onEachFeature: function (feature, layer) {
           if (feature.properties && feature.properties["SEED_ZONES"]) {
             // Add zone as popup to each layer
