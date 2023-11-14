@@ -6,6 +6,20 @@
 
 <script src="https://unpkg.com/leaflet@latest/dist/leaflet.js" crossorigin=""></script>
 <script src="https://unpkg.com/leaflet-providers@latest/leaflet-providers.js"></script>
+<script src="https://unpkg.com/@turf/turf@latest"></script>
+<style>
+.control-box {
+  height: 3em;
+  width: 15em;
+  background-color: #eeeeee;
+}
+
+.zone-label {
+  white-space: nowrap;
+  color: blue;
+  font-size: 1.5em;
+}
+</style>
 </head>
 <body>
 <div id="map" style="height: 100vh;"></div>
@@ -17,6 +31,14 @@
   var mymap = L.map('map').setView(startPoint, zoom);
   let control = new L.control.layers({}, {})
 
+  const onZones = (event) => {
+    console.log('EV', event.target.checked)
+    if (event.target.checked) {
+      markerLayerGroup.addTo(mymap)
+    } else {
+      mymap.removeLayer(markerLayerGroup)
+    }
+  }
 
   let openStreetMap = L.tileLayer.provider('OpenStreetMap', {})
   let openTopoMap = L.tileLayer.provider('OpenTopoMap', {})
@@ -28,6 +50,25 @@
   // Enable as default
   openStreetMap.addTo(mymap)
   mymap.addControl(control)
+
+  // Add data controls
+  L.Control.Box = L.Control.extend({
+    options: { position: 'bottomleft' },
+    onAdd: function () {
+      let div = L.DomUtil.create('div', 'control-box')
+      div.innerHTML = `
+        <label for="zones">Show Zone Numbers</label>
+        <input type="checkbox" id="zones" onchange="onZones(event)" checked>`
+      return div
+    },
+  })
+
+  let ctlBox = new L.Control.Box
+  mymap.addControl(ctlBox)
+
+  // Create a layer for zone markers
+  let markerLayerGroup = L.layerGroup()
+  markerLayerGroup.addTo(mymap)
 
   // Get the zones geoJSON
   let zoneLayer
@@ -46,6 +87,17 @@
           if (feature.properties && feature.properties["SEED_ZONES"]) {
             // Add zone as popup to each layer
             layer.bindPopup(`${feature.properties["SEED_ZONES"]}`, { autoClose: false, closeButton: true })
+            let centre = turf.centroid(feature)
+            let centreCoords = centre.geometry.coordinates.reverse()
+            let marker = L.marker(centreCoords, {
+              icon: L.divIcon({
+                className: "zone-label",
+                html: feature.properties["SEED_ZONES"],
+                // Hide the icon
+                opacity: 0,
+              })
+            })
+            markerLayerGroup.addLayer(marker)
           }
         }
       }).addTo(mymap)
